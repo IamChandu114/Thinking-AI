@@ -1,20 +1,19 @@
+# app/api/decision.py
 from fastapi import APIRouter
-from app.schemas.decision_schema import DecisionRequest, DecisionResponse
+from pydantic import BaseModel
 from app.services.reasoning_engine import ReasoningEngine
-from app.memory.decision_store import get_all_decisions
 
 router = APIRouter()
-engine = ReasoningEngine()
+engine = ReasoningEngine()  # Initialize the reasoning engine
 
+class CandidateInput(BaseModel):
+    input_text: str
 
-@router.post("/analyze", response_model=DecisionResponse)
-def analyze_decision(request: DecisionRequest):
-    return engine.think(request)
-
-
-@router.get("/history")
-def decision_history():
-    return {
-        "total_decisions": len(get_all_decisions()),
-        "decisions": get_all_decisions()
-    }
+@router.post("/analyze")
+def analyze(input_data: CandidateInput):
+    """
+    Endpoint to analyze candidate input.
+    Returns prediction, reasoning, confidence, and clarification questions.
+    """
+    result = engine.analyze_candidate(input_data.input_text)
+    return result

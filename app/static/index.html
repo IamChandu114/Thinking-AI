@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thinking AI • Top 1% Project</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* Reset & Base */
+* { box-sizing: border-box; margin:0; padding:0; font-family:'Inter',sans-serif;}
+body { background:#f0f2f7; color:#333; display:flex; min-height:100vh; }
+
+/* Sidebar */
+.sidebar { width:250px; background:#1f2937; color:white; display:flex; flex-direction:column; padding:1rem; }
+.sidebar h2 { margin-bottom:2rem; text-align:center; font-weight:700; }
+.sidebar a { color:white; text-decoration:none; margin:0.5rem 0; padding:0.5rem 1rem; border-radius:8px; display:block; transition:0.2s; }
+.sidebar a:hover { background:#374151; }
+.sidebar .active { background:#4f46e5; }
+
+/* Main content */
+.main { flex:1; padding:2rem; display:flex; flex-direction:column; overflow-y:auto; }
+
+/* Top navbar */
+.navbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; }
+.navbar h1 { font-size:1.8rem; font-weight:700; }
+.navbar button { padding:0.5rem 1rem; border:none; border-radius:6px; background:#4f46e5; color:white; cursor:pointer; transition:0.2s; }
+.navbar button:hover { background:#3730a3; }
+
+/* Panels */
+.panel { background:white; border-radius:10px; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 6px 15px rgba(0,0,0,0.05); }
+.panel h3 { margin-bottom:1rem; font-weight:600; }
+
+/* Textarea & Button */
+textarea { width:100%; min-height:100px; padding:1rem; border-radius:8px; border:1px solid #ccc; resize:vertical; font-size:1rem; }
+button.submit-btn { background:#4f46e5; color:white; border:none; padding:0.8rem 2rem; border-radius:8px; cursor:pointer; margin-top:1rem; transition:0.2s; }
+button.submit-btn:hover { background:#3730a3; }
+
+/* Confidence bar */
+.conf-bar { height:25px; width:100%; background:#e5e7eb; border-radius:12px; overflow:hidden; margin-top:0.5rem; }
+.conf-fill { height:100%; width:0%; background:green; text-align:center; color:white; font-weight:bold; line-height:25px; transition:width 0.5s; }
+
+/* Fit Badge */
+.fit-badge { display:inline-block; padding:0.3rem 0.8rem; border-radius:20px; font-weight:bold; color:white; margin-left:0.5rem; }
+
+/* Reasoning / Clarifications / History */
+.collapsible { cursor:pointer; padding:0.5rem; font-weight:600; background:#f3f4f6; border-radius:6px; margin-bottom:0.5rem; }
+.content { padding:0.5rem 1rem; display:none; background:#f9fafb; border-radius:6px; margin-bottom:0.5rem; }
+.history { max-height:250px; overflow-y:auto; }
+
+/* Charts */
+canvas { margin-top:1rem; }
+
+/* Login Modal */
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; visibility:hidden; opacity:0; transition:0.3s; }
+.modal.active { visibility:visible; opacity:1; }
+.modal-content { background:white; padding:2rem; border-radius:12px; width:350px; text-align:center; }
+.modal-content h2 { margin-bottom:1rem; }
+.modal-content input { width:100%; padding:0.8rem; margin:0.5rem 0; border-radius:6px; border:1px solid #ccc; }
+.modal-content button { margin-top:1rem; padding:0.8rem 1.5rem; background:#4f46e5; color:white; border:none; border-radius:6px; cursor:pointer; }
+.modal-content button:hover { background:#3730a3; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Thinking AI</h2>
+    <a href="#" class="active">Dashboard</a>
+    <a href="#">History</a>
+    <a href="#">Settings</a>
+    <a href="#" onclick="logout()">Logout</a>
+</div>
+
+<div class="main">
+    <div class="navbar">
+        <h1>Dashboard</h1>
+        <button onclick="openModal()">Login</button>
+    </div>
+
+    <!-- Input Panel -->
+    <div class="panel">
+        <h3>Candidate Input</h3>
+        <textarea id="inputText" placeholder="Enter candidate resume or profile text..."></textarea>
+        <button class="submit-btn" onclick="analyze()">Analyze & Reason</button>
+    </div>
+
+    <!-- Prediction Panel -->
+    <div class="panel">
+        <h3>Prediction & Confidence</h3>
+        <div>Prediction: <span id="prediction"></span> <span id="fitBadge" class="fit-badge"></span></div>
+        <div class="conf-bar"><div id="confFill" class="conf-fill">0%</div></div>
+        <canvas id="confChart" width="400" height="100"></canvas>
+    </div>
+
+    <!-- Reasoning Panel -->
+    <div class="panel">
+        <div class="collapsible" onclick="toggleReasoning()">Step-by-step Reasoning ▼</div>
+        <div id="reasoningContent" class="content"></div>
+    </div>
+
+    <!-- Clarifications Panel -->
+    <div class="panel">
+        <h3>Clarification Questions</h3>
+        <ul id="clarifications"></ul>
+    </div>
+
+    <!-- History Panel -->
+    <div class="panel">
+        <h3>Decision History</h3>
+        <div id="history" class="history"></div>
+    </div>
+</div>
+
+<!-- Login Modal -->
+<div class="modal" id="loginModal">
+    <div class="modal-content">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Username" />
+        <input type="password" id="password" placeholder="Password" />
+        <button onclick="login()">Login</button>
+    </div>
+</div>
+
+<script>
+let historyData = [];
+
+function openModal() {
+    document.getElementById('loginModal').classList.add('active');
+}
+
+function logout() {
+    alert("Logged out!");
+}
+
+function login() {
+    const user = document.getElementById('username').value;
+    const pass = document.getElementById('password').value;
+    if(user && pass){
+        document.getElementById('loginModal').classList.remove('active');
+        alert("Welcome, " + user + "!");
+    } else {
+        alert("Please enter username and password");
+    }
+}
+
+function toggleReasoning() {
+    const content = document.getElementById('reasoningContent');
+    content.style.display = content.style.display === 'block' ? 'none' : 'block';
+}
+
+// Simulated backend API call (replace with real FastAPI endpoint)
+async function analyze(){
+    const inputText = document.getElementById('inputText').value.trim();
+    if(!inputText) return alert("Enter candidate details");
+
+    // Mocked response for demo
+    const data = {
+        prediction: "Potential Fit",
+        confidence: 0.85,
+        reasoning: "The candidate has 5 years of experience in Python, ML, and data analysis. Step-by-step reasoning...",
+        needs_clarification: true,
+        clarification_questions: [
+            "Which ML frameworks are you proficient in?",
+            "Can you describe a challenging project you solved?"
+        ],
+        timestamp: new Date().toISOString()
+    };
+
+    // Update UI
+    document.getElementById('prediction').innerText = data.prediction;
+    const badge = document.getElementById('fitBadge');
+    badge.innerText = data.prediction;
+    badge.style.background = data.prediction === "Potential Fit" ? "green" : "orange";
+
+    const confFill = document.getElementById('confFill');
+    confFill.style.width = (data.confidence*100) + "%";
+    confFill.innerText = Math.round(data.confidence*100) + "%";
+    confFill.style.background = data.confidence>=0.7 ? "green" : "orange";
+
+    document.getElementById('reasoningContent').innerText = data.reasoning;
+
+    const clarList = document.getElementById('clarifications');
+    clarList.innerHTML = "";
+    data.clarification_questions.forEach(q => {
+        const li = document.createElement('li');
+        li.innerText = q;
+        clarList.appendChild(li);
+    });
+
+    historyData.unshift(data);
+    const historyDiv = document.getElementById('history');
+    historyDiv.innerHTML = "";
+    historyData.forEach(item => {
+        const div = document.createElement('div');
+        div.style.padding="0.5rem";
+        div.style.borderBottom="1px solid #e5e7eb";
+        div.innerHTML = `<strong>${item.prediction} (${Math.round(item.confidence*100)}%)</strong> - ${item.reasoning.substring(0,60)}...<div class="timestamp">${item.timestamp}</div>`;
+        historyDiv.appendChild(div);
+    });
+
+    // Update Chart
+    const ctx = document.getElementById('confChart').getContext('2d');
+    new Chart(ctx, {
+        type:'bar',
+        data: {
+            labels: ['Confidence'],
+            datasets:[{label:'Confidence', data:[data.confidence*100], backgroundColor:['#4f46e5']}]
+        },
+        options:{ responsive:true, animation:{duration:500}, scales:{y:{min:0,max:100}} }
+    });
+}
+</script>
+
+</body>
+</html>

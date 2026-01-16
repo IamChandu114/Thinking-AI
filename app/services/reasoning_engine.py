@@ -1,19 +1,15 @@
 # app/services/reasoning_engine.py
 import os
 import json
-from google import genai
+from google.genai import Client  # <-- change here
 
 class ReasoningEngine:
     def __init__(self):
-        # Initialize Gemini client with API key from environment variable
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        # Initialize Gemini client with API key
+        self.client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     def analyze_candidate(self, input_text: str):
-        """
-        Analyze candidate input and return structured reasoning output.
-        """
         try:
-            # Send input to Gemini and request structured JSON response
             response = self.client.generate_content(
                 model="gemini-2.5",
                 prompt=f"""
@@ -31,13 +27,10 @@ Output JSON format:
 """
             )
 
-            # Gemini returns a text; parse it into JSON
             result_text = response.content[0].text
-            result_json = json.loads(result_text)
-            return result_json
+            return json.loads(result_text)
 
         except Exception as e:
-            # Return fallback structured error
             return {
                 "prediction": "Error",
                 "confidence": 0,
